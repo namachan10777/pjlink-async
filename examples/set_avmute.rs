@@ -12,49 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate pjlink;
-
+use clap::Parser;
 use pjlink::{AvMute, PjlinkDevice};
-use std::env;
 
-static USAGE: &'static str = "[host][video mute (true, false)][audio mute (true, false)][password]";
+#[derive(Parser)]
+struct Opts {
+    host: String,
+    #[clap(short, long)]
+    password: Option<String>,
+    #[clap(short, long)]
+    video: bool,
+    #[clap(short, long)]
+    audio: bool,
+}
 
-fn main() {
-    let my_name = env::args().nth(0).unwrap();
+#[tokio::main]
+async fn main() {
+    let opts = Opts::parse();
 
-    let host = match env::args().nth(1) {
-        Some(hst) => hst,
-        None => {
-            panic!("Usage: {} {}", my_name, USAGE);
-        }
-    };
-
-    let password = match env::args().nth(4) {
-        Some(pwd) => pwd,
-        None => String::from(""),
-    };
-
-    let device: PjlinkDevice = if password != "" {
-        PjlinkDevice::new_with_password(&host, &password).unwrap()
+    let device: PjlinkDevice = if let Some(password) = &opts.password {
+        PjlinkDevice::new_with_password(&opts.host, &password).unwrap()
     } else {
-        PjlinkDevice::new(&host).unwrap()
+        PjlinkDevice::new(&opts.host).unwrap()
     };
 
-    let mutes = AvMute {
-        video: match env::args().nth(2) {
-            Some(arg) => arg.to_lowercase() == "true",
-            None => panic!("Usage: {} {}", my_name, USAGE),
-        },
-        audio: match env::args().nth(3) {
-            Some(arg) => arg.to_lowercase() == "true",
-            None => panic!("Usage: {} {}", my_name, USAGE),
-        },
-    };
-
-    match device.set_avmute(mutes) {
+    match device
+        .set_avmute(AvMute {
+            audio: opts.audio,
+            video: opts.video,
+        })
+        .await
+    {
         Ok(mutes) => println!(
             "{} Video Mute: {} Audio Mute: {}",
-            host, mutes.video, mutes.audio
+            opts.host, mutes.video, mutes.audio
         ),
         Err(err) => println!("An error occurred: {}", err),
     }

@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
-use std::net::TcpStream;
+#[cfg(feature = "tokio-runtime")]
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(feature = "tokio-runtime")]
+use tokio::net::TcpStream;
 
 extern crate md5;
 
@@ -183,12 +185,12 @@ impl PjlinkDevice {
     }
 
     /// Send a command and a Result with the raw string or an error
-    pub fn send_command(&self, command: &str) -> Result<String, Error> {
+    pub async fn send_command(&self, command: &str) -> Result<String, Error> {
         let host_port = [&self.host, ":", PORT].concat();
         let mut client_buffer = [0u8; 256];
-        let mut stream = TcpStream::connect(host_port)?;
+        let mut stream = TcpStream::connect(host_port).await?;
 
-        let _ = stream.read(&mut client_buffer); //Did we get the hello string?
+        let _ = stream.read(&mut client_buffer).await; //Did we get the hello string?
 
         let cmd: String = match client_buffer[7] as char {
             // Does the connection require auth or not
@@ -221,12 +223,12 @@ impl PjlinkDevice {
             }
         };
 
-        let result = stream.write(cmd.as_bytes());
+        let result = stream.write(cmd.as_bytes()).await;
         match result {
             Ok(_) => (),
             Err(e) => return Err(e),
         };
-        let result = stream.read(&mut client_buffer);
+        let result = stream.read(&mut client_buffer).await;
         let len = match result {
             Ok(len) => len,
             Err(e) => return Err(e),
@@ -237,8 +239,8 @@ impl PjlinkDevice {
     }
 
     // a wrapper around send_command that will parse the response
-    fn send(&self, cmd: &str) -> Result<PjlinkResponse, Error> {
-        match self.send_command(cmd) {
+    async fn send(&self, cmd: &str) -> Result<PjlinkResponse, Error> {
+        match self.send_command(cmd).await {
             Ok(send_result) => match parse_response(&send_result) {
                 Ok(parse_result) => Ok(parse_result),
                 Err(e) => Err(e),
@@ -248,8 +250,8 @@ impl PjlinkDevice {
     }
 
     /// Check the power status of the device and returns an enum
-    pub fn get_power_status(&self) -> Result<PowerStatus, Error> {
-        match self.send("POWR ?") {
+    pub async fn get_power_status(&self) -> Result<PowerStatus, Error> {
+        match self.send("POWR ?").await {
             Ok(result) => {
                 match result.action {
                     CommandType::Power => {
@@ -277,13 +279,13 @@ impl PjlinkDevice {
     /// Turn on the device and will return a Result enum with
     /// Ok being a [pjlink::PowerStatus](enum.PowerStatus.html) or Err being a std::io::Error
     ///
-    pub fn power_on(&self) -> Result<PowerStatus, Error> {
-        match self.send("POWR 1") {
+    pub async fn power_on(&self) -> Result<PowerStatus, Error> {
+        match self.send("POWR 1").await {
             Ok(result) => {
                 match result.action {
                     CommandType::Power => {
                         match &result.value[0..2] {
-                            "OK" => match self.get_power_status() {
+                            "OK" => match self.get_power_status().await {
                                 Ok(status) => Ok(status),
                                 Err(e) => Err(e),
                             },
@@ -306,13 +308,13 @@ impl PjlinkDevice {
     /// Turn off the device and will return a Result enum with
     /// Ok being a [pjlink::PowerStatus](enum.PowerStatus.html) or Err being a std::io::Error
     ///
-    pub fn power_off(&self) -> Result<PowerStatus, Error> {
-        match self.send("POWR 0") {
+    pub async fn power_off(&self) -> Result<PowerStatus, Error> {
+        match self.send("POWR 0").await {
             Ok(result) => {
                 match result.action {
                     CommandType::Power => {
                         match &result.value[0..2] {
-                            "OK" => match self.get_power_status() {
+                            "OK" => match self.get_power_status().await {
                                 Ok(status) => Ok(status),
                                 Err(e) => Err(e),
                             },
@@ -335,8 +337,8 @@ impl PjlinkDevice {
     /// Get the information (INFO ?) from theand returns a
     /// string with the information or a std::io::Error
     ///
-    pub fn get_info(&self) -> Result<String, Error> {
-        match self.send("INFO ?") {
+    pub async fn get_info(&self) -> Result<String, Error> {
+        match self.send("INFO ?").await {
             Ok(result) => match result.action {
                 CommandType::Information => Ok(result.value),
                 _ => Err(Error::new(
@@ -351,8 +353,8 @@ impl PjlinkDevice {
     /// Get the manufacturer (INF1 ?) from the deviceand returns a
     /// string with the information or a std::io::Error
     ///
-    pub fn get_manufacturer(&self) -> Result<String, Error> {
-        match self.send("INF1 ?") {
+    pub async fn get_manufacturer(&self) -> Result<String, Error> {
+        match self.send("INF1 ?").await {
             Ok(result) => match result.action {
                 CommandType::Manufacturer => Ok(result.value),
                 _ => Err(Error::new(
@@ -367,8 +369,8 @@ impl PjlinkDevice {
     /// Get the product name (INF2 ?) from the deviceand returns a
     /// string with the information or a std::io::Error
     ///
-    pub fn get_product_name(&self) -> Result<String, Error> {
-        match self.send("INF2 ?") {
+    pub async fn get_product_name(&self) -> Result<String, Error> {
+        match self.send("INF2 ?").await {
             Ok(result) => match result.action {
                 CommandType::ProductName => Ok(result.value),
                 _ => Err(Error::new(
@@ -382,8 +384,8 @@ impl PjlinkDevice {
     /// Get the product class (CLSS ?) from the deviceand returns a
     /// string with the information or a std::io::Error
     ///
-    pub fn get_class(&self) -> Result<String, Error> {
-        match self.send("CLSS ?") {
+    pub async fn get_class(&self) -> Result<String, Error> {
+        match self.send("CLSS ?").await {
             Ok(result) => match result.action {
                 CommandType::Class => Ok(result.value),
                 _ => Err(Error::new(
@@ -398,8 +400,8 @@ impl PjlinkDevice {
     /// Get the device name (NAME ?) from the device and returns a
     /// string with the information or a std::io::Error
     ///
-    pub fn get_device_name(&self) -> Result<String, Error> {
-        match self.send("NAME ?") {
+    pub async fn get_device_name(&self) -> Result<String, Error> {
+        match self.send("NAME ?").await {
             Ok(result) => match result.action {
                 CommandType::Name => Ok(result.value),
                 _ => Err(Error::new(
@@ -418,8 +420,8 @@ impl PjlinkDevice {
     ///
     /// ```
     ///
-    pub fn get_input(&self) -> Result<InputType, Error> {
-        match self.send("INPT ?") {
+    pub async fn get_input(&self) -> Result<InputType, Error> {
+        match self.send("INPT ?").await {
             Ok(result) => {
                 let input = result.value.parse::<u8>().unwrap();
                 match input {
@@ -458,7 +460,7 @@ impl PjlinkDevice {
     /// }
     /// ```
     ///
-    pub fn set_input(&self, input: InputType) -> Result<InputType, Error> {
+    pub async fn set_input(&self, input: InputType) -> Result<InputType, Error> {
         let input_number: u8 = match input {
             InputType::RGB(i_num) => i_num + 10,
             InputType::Video(i_num) => i_num + 20,
@@ -468,12 +470,12 @@ impl PjlinkDevice {
         };
 
         let command = format!("INPT {}", input_number);
-        match self.send(&command) {
+        match self.send(&command).await {
             Ok(result) => {
                 match result.action {
                     CommandType::Input => {
                         match &result.value[0..2] {
-                            "OK" => match self.get_input() {
+                            "OK" => match self.get_input().await {
                                 Ok(status) => Ok(status),
                                 Err(e) => Err(e),
                             },
@@ -500,8 +502,8 @@ impl PjlinkDevice {
     ///
     /// ```
     ///
-    pub fn get_avmute(&self) -> Result<AvMute, Error> {
-        match self.send("AVMT ?") {
+    pub async fn get_avmute(&self) -> Result<AvMute, Error> {
+        match self.send("AVMT ?").await {
             Ok(result) => {
                 let status = result.value.parse::<u8>().unwrap();
                 match status {
@@ -549,7 +551,7 @@ impl PjlinkDevice {
     ///
     /// ```
     ///
-    pub fn set_avmute(&self, mute_status: AvMute) -> Result<AvMute, Error> {
+    pub async fn set_avmute(&self, mute_status: AvMute) -> Result<AvMute, Error> {
         let mutes: u8 = match mute_status {
             AvMute {
                 video: true,
@@ -567,12 +569,12 @@ impl PjlinkDevice {
         };
 
         let command = format!("AVMT {}", mutes);
-        match self.send(&command) {
+        match self.send(&command).await {
             Ok(result) => {
                 match result.action {
                     CommandType::AvMute => {
                         match &result.value[0..2] {
-                            "OK" => match self.get_avmute() {
+                            "OK" => match self.get_avmute().await {
                                 Ok(status) => Ok(status),
                                 Err(e) => Err(e),
                             },
@@ -600,8 +602,8 @@ impl PjlinkDevice {
     ///
     /// ```
     ///
-    pub fn get_lamp(&self) -> Result<Vec<Lamp>, Error> {
-        match self.send("LAMP ?") {
+    pub async fn get_lamp(&self) -> Result<Vec<Lamp>, Error> {
+        match self.send("LAMP ?").await {
             Ok(result) => {
                 let mut status = result.value.split_whitespace();
                 let mut lamps = Vec::new();
@@ -612,10 +614,7 @@ impl PjlinkDevice {
                         Some(x) => x == "1",
                         None => false,
                     };
-                    lamps.push(Lamp {
-                        hours,
-                        on,
-                    });
+                    lamps.push(Lamp { hours, on });
                 }
                 Ok(lamps)
             }
@@ -664,8 +663,8 @@ impl PjlinkDevice {
     ///
     /// ```
     ///
-    pub fn get_error_status(&self) -> Result<ErrorStatus, Error> {
-        match self.send("ERST ?") {
+    pub async fn get_error_status(&self) -> Result<ErrorStatus, Error> {
+        match self.send("ERST ?").await {
             Ok(result) => {
                 let mut status = result.value.chars();
 

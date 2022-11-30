@@ -12,138 +12,135 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate pjlink;
-
+use clap::Parser;
 use pjlink::{ErrorType, InputType, PjlinkDevice, PowerStatus};
-use std::env;
 
-fn main() {
-    let host = match env::args().nth(1) {
-        Some(hst) => hst,
-        None => {
-            let my_name = env::args().nth(0).unwrap();
-            panic!("Usage: {} [host][password]", my_name)
-        }
-    };
+#[derive(clap::Parser)]
+struct Opts {
+    host: String,
+    #[clap(short, long)]
+    password: Option<String>,
+}
 
-    let password = match env::args().nth(2) {
-        Some(pwd) => pwd,
-        None => String::from(""),
-    };
+#[tokio::main]
+async fn main() {
+    let opts = Opts::parse();
 
-    let device: PjlinkDevice = if password != "" {
-        PjlinkDevice::new_with_password(&host, &password).unwrap()
+    let device: PjlinkDevice = if let Some(password) = opts.password {
+        PjlinkDevice::new_with_password(&opts.host, &password).unwrap()
     } else {
-        PjlinkDevice::new(&host).unwrap()
+        PjlinkDevice::new(&opts.host).unwrap()
     };
 
-    match device.get_device_name() {
-        Ok(response) => println!("{} Device Name: {}", host, response),
-        Err(err) => println!("{} Device: error occurred: {}", host, err),
+    match device.get_device_name().await {
+        Ok(response) => println!("{} Device Name: {}", opts.host, response),
+        Err(err) => println!("{} Device: error occurred: {}", opts.host, err),
     }
 
-    match device.get_manufacturer() {
-        Ok(response) => println!("{} Manufacturer: {}", host, response),
-        Err(err) => println!("{} Manugacturer: error occurred: {}", host, err),
+    match device.get_manufacturer().await {
+        Ok(response) => println!("{} Manufacturer: {}", opts.host, response),
+        Err(err) => println!("{} Manugacturer: error occurred: {}", opts.host, err),
     }
 
-    match device.get_product_name() {
-        Ok(response) => println!("{} Product: {}", host, response),
-        Err(err) => println!("{} Product: error occurred: {}", host, err),
+    match device.get_product_name().await {
+        Ok(response) => println!("{} Product: {}", opts.host, response),
+        Err(err) => println!("{} Product: error occurred: {}", opts.host, err),
     }
 
-    match device.get_info() {
-        Ok(response) => println!("{} Infomation: {}", host, response),
-        Err(err) => println!("{} Info: error occurred: {}", host, err),
+    match device.get_info().await {
+        Ok(response) => println!("{} Infomation: {}", opts.host, response),
+        Err(err) => println!("{} Info: error occurred: {}", opts.host, err),
     }
 
-    match device.get_class() {
-        Ok(response) => println!("{} Class: {}", host, response),
-        Err(err) => println!("{} Class: error occurred: {}", host, err),
+    match device.get_class().await {
+        Ok(response) => println!("{} Class: {}", opts.host, response),
+        Err(err) => println!("{} Class: error occurred: {}", opts.host, err),
     }
 
-    match device.get_power_status() {
+    match device.get_power_status().await {
         Ok(response) => match response {
-            PowerStatus::Off => println!("{} Power: off", host),
-            PowerStatus::On => println!("{} Power: on", host),
-            PowerStatus::Cooling => println!("{} Power: cooling", host),
-            PowerStatus::Warmup => println!("{} Power: warming up", host),
+            PowerStatus::Off => println!("{} Power: off", opts.host),
+            PowerStatus::On => println!("{} Power: on", opts.host),
+            PowerStatus::Cooling => println!("{} Power: cooling", opts.host),
+            PowerStatus::Warmup => println!("{} Power: warming up", opts.host),
         },
-        Err(err) => println!("{} Power: error occurred: {}", host, err),
+        Err(err) => println!("{} Power: error occurred: {}", opts.host, err),
     }
 
-    match device.get_input() {
+    match device.get_input().await {
         Ok(input) => match input {
-            InputType::RGB(input_number) => println!("{} Input: RGB {}", host, input_number),
-            InputType::Video(input_number) => println!("{} Input: Video {}", host, input_number),
+            InputType::RGB(input_number) => println!("{} Input: RGB {}", opts.host, input_number),
+            InputType::Video(input_number) => {
+                println!("{} Input: Video {}", opts.host, input_number)
+            }
             InputType::Digital(input_number) => {
-                println!("{} Input: Digital {}", host, input_number)
+                println!("{} Input: Digital {}", opts.host, input_number)
             }
             InputType::Storage(input_number) => {
-                println!("{} Input: Storage {}", host, input_number)
+                println!("{} Input: Storage {}", opts.host, input_number)
             }
             InputType::Network(input_number) => {
-                println!("{} Input: Network {}", host, input_number)
+                println!("{} Input: Network {}", opts.host, input_number)
             }
         },
-        Err(err) => println!("{} Input: error occurred: {}", host, err),
+        Err(err) => println!("{} Input: error occurred: {}", opts.host, err),
     }
 
-    match device.get_avmute() {
+    match device.get_avmute().await {
         Ok(response) => println!(
             "{} Video Mute: {} Audio Mute: {}",
-            host, response.video, response.audio
+            opts.host, response.video, response.audio
         ),
-        Err(err) => println!("{} AvMute: error occurred: {}", host, err),
+        Err(err) => println!("{} AvMute: error occurred: {}", opts.host, err),
     }
 
-    match device.get_lamp() {
+    match device.get_lamp().await {
         Ok(response) => {
             let mut lamp_count = 1;
             for lamp in response.iter() {
                 println!(
                     "{} Lamp {}: Hours: {} On: {}",
-                    host, lamp_count, lamp.hours, lamp.on
+                    opts.host, lamp_count, lamp.hours, lamp.on
                 );
                 lamp_count += 1;
             }
         }
-        Err(err) => println!("{} Lamp: error occurred: {}", host, err),
+        Err(err) => println!("{} Lamp: error occurred: {}", opts.host, err),
     }
 
-    match device.get_error_status() {
+    match device.get_error_status().await {
         Ok(error_status) => {
             match error_status.fan_error {
-                ErrorType::Warning => println!("{} Error Status: Fan Warning", host),
-                ErrorType::Error => println!("{} Error Status: Fan Error", host),
+                ErrorType::Warning => println!("{} Error Status: Fan Warning", opts.host),
+                ErrorType::Error => println!("{} Error Status: Fan Error", opts.host),
                 _ => (),
             }
             match error_status.lamp_error {
-                ErrorType::Warning => println!("{} Error Status: Lamp Warning", host),
-                ErrorType::Error => println!("{} Error Status: Lamp Error", host),
+                ErrorType::Warning => println!("{} Error Status: Lamp Warning", opts.host),
+                ErrorType::Error => println!("{} Error Status: Lamp Error", opts.host),
                 _ => (),
             }
             match error_status.temperature_error {
-                ErrorType::Warning => println!("{} Error Status: Temperature Warning", host),
-                ErrorType::Error => println!("{} Error Status: Temperature Error", host),
+                ErrorType::Warning => println!("{} Error Status: Temperature Warning", opts.host),
+                ErrorType::Error => println!("{} Error Status: Temperature Error", opts.host),
                 _ => (),
             }
             match error_status.cover_open_error {
-                ErrorType::Warning => println!("{} Error Status: Cover Open Warning", host),
-                ErrorType::Error => println!("{} Error Status: Cover Open Error", host),
+                ErrorType::Warning => println!("{} Error Status: Cover Open Warning", opts.host),
+                ErrorType::Error => println!("{} Error Status: Cover Open Error", opts.host),
                 _ => (),
             }
             match error_status.filter_error {
-                ErrorType::Warning => println!("{} Error Status: Filter Warning", host),
-                ErrorType::Error => println!("{} Error Status: Filter Error", host),
+                ErrorType::Warning => println!("{} Error Status: Filter Warning", opts.host),
+                ErrorType::Error => println!("{} Error Status: Filter Error", opts.host),
                 _ => (),
             }
             match error_status.other_error {
-                ErrorType::Warning => println!("{} Error Status: Other Warning", host),
-                ErrorType::Error => println!("{} Error Status: Other Error", host),
+                ErrorType::Warning => println!("{} Error Status: Other Warning", opts.host),
+                ErrorType::Error => println!("{} Error Status: Other Error", opts.host),
                 _ => (),
             }
         }
-        Err(err) => println!("{} Error Status: error occurred: {}", host, err),
+        Err(err) => println!("{} Error Status: error occurred: {}", opts.host, err),
     }
 }

@@ -12,43 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate pjlink;
+use clap::Parser;
+use pjlink::{InputType, PjlinkDevice};
 
-use pjlink::{PjlinkDevice,InputType};
-use std::{env};
+#[derive(clap::Parser)]
+struct Opts {
+    host: String,
+    #[clap(short, long)]
+    password: Option<String>,
+}
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let opts = Opts::parse();
 
-    let host = match env::args().nth(1) {
-        Some(hst) => hst,
-        None => {
-            let my_name = env::args().nth(0).unwrap();
-            panic!("Usage: {} [host][password]", my_name)
-        }
-    };
-
-    let password = match env::args().nth(2) {
-        Some(pwd) => pwd,
-        None => String::from("")
-    };
-
-    let device: PjlinkDevice = if password != "" {
-        PjlinkDevice::new_with_password(&host, &password).unwrap()
+    let device: PjlinkDevice = if let Some(password) = opts.password {
+        PjlinkDevice::new_with_password(&opts.host, &password).unwrap()
     } else {
-        PjlinkDevice::new(&host).unwrap()
+        PjlinkDevice::new(&opts.host).unwrap()
     };
 
-    match device.get_input() {
-        Ok(input) => {
-            match input {
-                InputType::RGB(input_number) => println!("Input: RGB {}", input_number),
-                InputType::Video(input_number) => println!("Input: Video {}", input_number),
-                InputType::Digital(input_number) => println!("Input: Digital {}", input_number),
-                InputType::Storage(input_number) => println!("Input: Storage {}", input_number),
-                InputType::Network(input_number) => println!("Input: Network {}", input_number),
-            }
+    match device.get_input().await {
+        Ok(input) => match input {
+            InputType::RGB(input_number) => println!("Input: RGB {}", input_number),
+            InputType::Video(input_number) => println!("Input: Video {}", input_number),
+            InputType::Digital(input_number) => println!("Input: Digital {}", input_number),
+            InputType::Storage(input_number) => println!("Input: Storage {}", input_number),
+            InputType::Network(input_number) => println!("Input: Network {}", input_number),
         },
         Err(err) => println!("An error occurred: {}", err),
     }
-
 }

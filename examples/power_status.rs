@@ -12,40 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate pjlink;
+use clap::Parser;
+use pjlink::{PjlinkDevice, PowerStatus};
 
-use pjlink::{PjlinkDevice,PowerStatus};
-use std::{env};
+#[derive(Parser)]
+struct Opts {
+    host: String,
+    #[clap(short, long)]
+    password: Option<String>,
+}
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let opts = Opts::parse();
 
-    let host = match env::args().nth(1) {
-        Some(hst) => hst,
-        None => {
-            let my_name = env::args().nth(0).unwrap();
-            panic!("Usage: {} [host][password]", my_name)
-        }
-    };
-
-    let password = match env::args().nth(2) {
-        Some(pwd) => pwd,
-        None => String::from("")
-    };
-
-    let device: PjlinkDevice = if password != "" {
-        PjlinkDevice::new_with_password(&host, &password).unwrap()
+    let device: PjlinkDevice = if let Some(password) = opts.password {
+        PjlinkDevice::new_with_password(&opts.host, &password).unwrap()
     } else {
-        PjlinkDevice::new(&host).unwrap()
+        PjlinkDevice::new(&opts.host).unwrap()
     };
 
-    match device.get_power_status() {
+    match device.get_power_status().await {
         Ok(response) => match response {
-            PowerStatus::Off => println!("{} is off", host),
-            PowerStatus::On => println!("{} is on", host),
-            PowerStatus::Cooling => println!("{} is cooling", host),
-            PowerStatus::Warmup => println!("{} is warming up", host),
-        }
+            PowerStatus::Off => println!("{} is off", opts.host),
+            PowerStatus::On => println!("{} is on", opts.host),
+            PowerStatus::Cooling => println!("{} is cooling", opts.host),
+            PowerStatus::Warmup => println!("{} is warming up", opts.host),
+        },
         Err(err) => println!("An error occurred: {}", err),
     }
-
 }

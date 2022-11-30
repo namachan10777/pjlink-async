@@ -8,8 +8,13 @@ repository = "https://github.com/namachan10777/pjlink"
 license = "Apache-2.0"
 
 [features]
-tokio-runtime = [ "tokio/net" ]
+default = ["tokio-runtime"]
+tokio-runtime = [ "tokio/net", "tokio/io-util" ]
 
 [dependencies]
 md5 = "0.3.7"
-tokio = "1.22.0"
+tokio = {version="1", optional = true}
+
+[dev-dependencies]
+tokio = {version="1", features=["macros", "rt-multi-thread"]}
+clap = { version = "4.0.29", features = ["derive"] }
