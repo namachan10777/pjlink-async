@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "async-std-runtime")]
+use async_std::{io::ReadExt, io::WriteExt, net::TcpStream};
 use std::io::{Error, ErrorKind};
 #[cfg(feature = "tokio-runtime")]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-#[cfg(feature = "tokio-runtime")]
-use tokio::net::TcpStream;
+use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
 
 extern crate md5;
 
@@ -445,8 +445,8 @@ impl PjlinkDevice {
     ///  of the input number or an std::io::Error
     ///
     /// ```
-    /// let result = pjlink::PjlinkDevice::set_input(&self, input: InputType).?
-    /// match device.get_input() {
+    /// let result = pjlink::PjlinkDevice::set_input(&self, input: InputType).await?;
+    /// match device.get_input().await {
     ///    Ok(input) => {
     ///        match input {
     ///            InputType::RGB(input_number) => println!("Input: RGB {}", input_number),
@@ -541,7 +541,7 @@ impl PjlinkDevice {
     ///     audio: true,
     /// }
     ///
-    /// match device.set_avmute(mutes) {
+    /// match device.set_avmute(mutes).await {
     ///     Ok(mutes) => println!(
     ///         "{} Video Mute: {} Audio Mute: {}",
     ///         host, mutes.video, mutes.audio
@@ -625,7 +625,7 @@ impl PjlinkDevice {
     /// Get the current error status of the device (ERST ?)
     /// Returns a Result enum with an Ok being a [pjlink::ErrorStatus](struct.Lamp.html) example would be:
     /// ```
-    /// match device.get_error_status() {
+    /// match device.get_error_status().await {
     ///    Ok(error_status) => {
     ///        match error_status.fan_error {
     ///            ErrorType::Warning => println!("{} Error Status: Fan Warning", host),
