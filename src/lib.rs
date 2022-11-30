@@ -20,7 +20,7 @@ extern crate md5;
 
 const AUTH: char = '1';
 const NOAUTH: char = '0';
-static PORT: &'static str = "4352";
+static PORT: &str = "4352";
 
 // Return the correct error message based on the PJ Link specification
 fn pjlink_error(error_msg: &str) -> Error {
@@ -59,7 +59,7 @@ fn parse_response(response: &str) -> Result<PjlinkResponse, Error> {
     }
 
     let command = if &response[0..1] != "%" {
-        CommandType::PJLINK
+        CommandType::Pjlink
     } else {
         match &response[2..equals_sign] {
             "POWR" => CommandType::Power,
@@ -98,7 +98,7 @@ fn parse_response(response: &str) -> Result<PjlinkResponse, Error> {
 // This is the list of standard command/response types from the PJLink spec.
 // At this point I would think that this would only be used internally.
 enum CommandType {
-    PJLINK,
+    Pjlink,
     Power,
     Input,
     AvMute,
@@ -186,7 +186,7 @@ impl PjlinkDevice {
     pub fn send_command(&self, command: &str) -> Result<String, Error> {
         let host_port = [&self.host, ":", PORT].concat();
         let mut client_buffer = [0u8; 256];
-        let mut stream = try!(TcpStream::connect(host_port));
+        let mut stream = TcpStream::connect(host_port)?;
 
         let _ = stream.read(&mut client_buffer); //Did we get the hello string?
 
@@ -195,7 +195,7 @@ impl PjlinkDevice {
             AUTH => {
                 // Connection requires auth
                 let rnd_num = String::from_utf8_lossy(&client_buffer[9..17]).to_string();
-                if &self.password != "" {
+                if !self.password.is_empty() {
                     // We got a password
                     let pwd_str = format!("{}{}", rnd_num, &self.password);
                     let digest = md5::compute(pwd_str);
@@ -423,11 +423,11 @@ impl PjlinkDevice {
             Ok(result) => {
                 let input = result.value.parse::<u8>().unwrap();
                 match input {
-                    11...19 => Ok(InputType::RGB(input - 10)),
-                    21...29 => Ok(InputType::Video(input - 20)),
-                    31...39 => Ok(InputType::Digital(input - 30)),
-                    41...49 => Ok(InputType::Storage(input - 40)),
-                    51...59 => Ok(InputType::Network(input - 50)),
+                    11..=19 => Ok(InputType::RGB(input - 10)),
+                    21..=29 => Ok(InputType::Video(input - 20)),
+                    31..=39 => Ok(InputType::Digital(input - 30)),
+                    41..=49 => Ok(InputType::Storage(input - 40)),
+                    51..=59 => Ok(InputType::Network(input - 50)),
                     _ => Err(Error::new(
                         ErrorKind::InvalidInput,
                         format!("Invalid input:: {}", input),
@@ -613,8 +613,8 @@ impl PjlinkDevice {
                         None => false,
                     };
                     lamps.push(Lamp {
-                        hours: hours,
-                        on: on,
+                        hours,
+                        on,
                     });
                 }
                 Ok(lamps)

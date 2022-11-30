@@ -14,7 +14,7 @@
 
 extern crate pjlink;
 
-use pjlink::{ErrorStatus, ErrorType, InputType, PjlinkDevice, PowerStatus};
+use pjlink::{ErrorType, InputType, PjlinkDevice, PowerStatus};
 use std::env;
 
 fn main() {

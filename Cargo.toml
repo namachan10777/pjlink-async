@@ -1,10 +1,15 @@
 [package]
 name = "pjlink"
+edition = "2021"
 version = "0.2.0"
 description = "A PJLink library that can be used to commmicate over the network with PJLink enabled devices such as a projector or display"
-authors = ["Rick Russell <rick@rickrussell.org>"]
-repository = "https://github.com/macoss/pjlink"
+authors = ["Rick Russell <rick@rickrussell.org>", "Masaki Nakano <admin@namachan10777.dev>"]
+repository = "https://github.com/namachan10777/pjlink"
 license = "Apache-2.0"
+
+[features]
+tokio-runtime = [ "tokio/net" ]
 
 [dependencies]
 md5 = "0.3.7"
+tokio = "1.22.0"
