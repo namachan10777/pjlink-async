@@ -1,19 +1,19 @@
 [package]
-name = "pjlink"
-edition = "2021"
-version = "0.2.0"
-description = "A PJLink library that can be used to commmicate over the network with PJLink enabled devices such as a projector or display"
 authors = ["Rick Russell <rick@rickrussell.org>", "Masaki Nakano <admin@namachan10777.dev>"]
-repository = "https://github.com/namachan10777/pjlink"
+description = "A PJLink library that can be used to commmicate over the network with PJLink enabled devices such as a projector or display"
+edition = "2021"
 license = "Apache-2.0"
+name = "pjlink"
+repository = "https://github.com/namachan10777/pjlink"
+version = "0.2.0"
 
 [features]
 async-std-runtime = ["async-std"]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/net", "tokio/io-util"]
+tokio-runtime = ["tokio/net", "tokio/io-util", "tokio/time"]
 
 [dependencies]
-async-std = {version = "1.12.0", optional = true}
+async-std = {version = "1", optional = true}
 md5 = "0.3.7"
 tokio = {version = "1", optional = true}
 

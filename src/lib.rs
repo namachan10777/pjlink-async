@@ -13,10 +13,19 @@
 // limitations under the License.
 
 #[cfg(feature = "async-std-runtime")]
-use async_std::{io::ReadExt, io::WriteExt, net::TcpStream};
-use std::io::{Error, ErrorKind};
+use async_std::{
+    io::{prelude::BufReadExt, WriteExt},
+    net::TcpStream,
+};
+use std::{
+    io::{Error, ErrorKind},
+    time::Duration,
+};
 #[cfg(feature = "tokio-runtime")]
-use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 extern crate md5;
 
@@ -163,11 +172,42 @@ struct PjlinkResponse {
 pub struct PjlinkDevice {
     pub host: String,
     password: String,
+    timeout: Duration,
     //managed: bool, // Currently not implemented but will add managed monitoring support with call backs with the status changes
     //monitored: bool, // Currenly not implemented by will allow you to monitor a device with out mainting authority over it.
 }
 
+pub struct PjLinkBuilder {
+    inner: PjlinkDevice,
+}
+
+impl PjLinkBuilder {
+    pub fn password(mut self, password: String) -> PjLinkBuilder {
+        self.inner.password = password;
+        self
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -> PjLinkBuilder {
+        self.inner.timeout = timeout;
+        self
+    }
+
+    pub fn build(self) -> Result<PjlinkDevice, Error> {
+        Ok(self.inner)
+    }
+}
+
 impl PjlinkDevice {
+    pub fn builder(host: String) -> PjLinkBuilder {
+        PjLinkBuilder {
+            inner: Self {
+                host,
+                password: Default::default(),
+                timeout: Default::default(),
+            },
+        }
+    }
+
     /// Constructs a new PjlinkDevice.
     pub fn new(host: &str) -> Result<PjlinkDevice, Error> {
         let pwd = String::from("");
@@ -179,6 +219,7 @@ impl PjlinkDevice {
         Ok(PjlinkDevice {
             host: host.to_string(),
             password: String::from(password),
+            timeout: Duration::MAX,
             //managed: false, // Hard coded for now until it is implemented
             //monitored: false, // Hard coded for now until it is implemented
         })
@@ -187,10 +228,26 @@ impl PjlinkDevice {
     /// Send a command and a Result with the raw string or an error
     pub async fn send_command(&self, command: &str) -> Result<String, Error> {
         let host_port = [&self.host, ":", PORT].concat();
-        let mut client_buffer = [0u8; 256];
-        let mut stream = TcpStream::connect(host_port).await?;
+        let mut client_buffer = Vec::new();
+        #[cfg(feature = "async-std-runtime")]
+        let mut stream =
+            async_std::io::timeout(self.timeout, TcpStream::connect(host_port)).await?;
+        #[cfg(feature = "tokio-runtime")]
+        let mut stream =
+            tokio::time::timeout(self.timeout, TcpStream::connect(host_port)).await??;
 
-        let _ = stream.read(&mut client_buffer).await; //Did we get the hello string?
+        #[cfg(feature = "async-std-runtime")]
+        {
+            let mut stream = async_std::io::BufReader::new(&mut stream);
+            async_std::io::timeout(self.timeout, stream.read_until(b'\n', &mut client_buffer))
+                .await?;
+        }
+        #[cfg(feature = "tokio-runtime")]
+        {
+            let mut stream = tokio::io::BufReader::new(&mut stream);
+            tokio::time::timeout(self.timeout, stream.read_until(b'\n', &mut client_buffer))
+                .await??;
+        }
 
         let cmd: String = match client_buffer[7] as char {
             // Does the connection require auth or not
@@ -223,16 +280,25 @@ impl PjlinkDevice {
             }
         };
 
-        let result = stream.write(cmd.as_bytes()).await;
-        match result {
-            Ok(_) => (),
-            Err(e) => return Err(e),
+        #[cfg(feature = "async-std-runtime")]
+        async_std::io::timeout(self.timeout, stream.write(cmd.as_bytes())).await?;
+        #[cfg(feature = "tokio-runtime")]
+        tokio::time::timeout(self.timeout, stream.write(cmd.as_bytes())).await??;
+
+        #[cfg(feature = "async-std-runtime")]
+        let len = {
+            let mut stream = async_std::io::BufReader::new(&mut stream);
+            async_std::io::timeout(self.timeout, stream.read_until(b'\n', &mut client_buffer))
+                .await?
         };
-        let result = stream.read(&mut client_buffer).await;
-        let len = match result {
-            Ok(len) => len,
-            Err(e) => return Err(e),
+        #[cfg(feature = "tokio-runtime")]
+        let len = {
+            let mut stream = tokio::io::BufReader::new(&mut stream);
+            tokio::time::timeout(self.timeout, stream.read_until(b'\n', &mut client_buffer))
+                .await??
         };
+
+        stream.shutdown().await?;
 
         let response = String::from_utf8_lossy(&client_buffer[0..len - 1]).to_string();
         Ok(response)
